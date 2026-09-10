@@ -1,0 +1,74 @@
+[
+  {
+    "id": "STU001",
+    "student_class": "101",
+    "student_seat": "01",
+    "student_name": "陳品安",
+    "parent_name": "陳先生",
+    "parent_email": "pinan.parent@example.com",
+    "parent_phone": "0912-345-671"
+  },
+  {
+    "id": "STU002",
+    "student_class": "101",
+    "student_seat": "02",
+    "student_name": "林子晴",
+    "parent_name": "林媽媽",
+    "parent_email": "tzu.parent@example.com",
+    "parent_phone": "0923-456-782"
+  },
+  {
+    "id": "STU003",
+    "student_class": "101",
+    "student_seat": "03",
+    "student_name": "張宇哲",
+    "parent_name": "張爸爸",
+    "parent_email": "yuzhe.parent@example.com",
+    "parent_phone": "0934-567-893"
+  },
+  {
+    "id": "STU004",
+    "student_class": "101",
+    "student_seat": "04",
+    "student_name": "黃宣雅",
+    "parent_name": "黃媽媽",
+    "parent_email": "xuanya.parent@example.com",
+    "parent_phone": "0945-678-904"
+  },
+  {
+    "id": "STU005",
+    "student_class": "101",
+    "student_seat": "05",
+    "student_name": "李冠廷",
+    "parent_name": "李先生",
+    "parent_email": "guanting.parent@example.com",
+    "parent_phone": "0956-789-015"
+  },
+  {
+    "id": "STU006",
+    "student_class": "101",
+    "student_seat": "06",
+    "student_name": "王柏翔",
+    "parent_name": "王媽媽",
+    "parent_email": "boxiang.parent@example.com",
+    "parent_phone": "0967-890-126"
+  },
+  {
+    "id": "STU007",
+    "student_class": "101",
+    "student_seat": "07",
+    "student_name": "吳若熙",
+    "parent_name": "吳爸爸",
+    "parent_email": "ruoxi.parent@example.com",
+    "parent_phone": "0978-901-237"
+  },
+  {
+    "id": "STU008",
+    "student_class": "101",
+    "student_seat": "08",
+    "student_name": "周宸宇",
+    "parent_name": "周媽媽",
+    "parent_email": "chenyu.parent@example.com",
+    "parent_phone": "0989-012-348"
+  }
+]

@@ -1,0 +1,33 @@
+[
+  {
+    "id": "REM-1789022913",
+    "timestamp": "2026-09-10 14:48:33",
+    "type": "管理員手動催繳",
+    "target_count": 5,
+    "success_count": 0,
+    "failed_count": 5,
+    "recipients": [
+      "黃宣雅 (待發)",
+      "李冠廷 (待發)",
+      "王柏翔 (待發)",
+      "吳若熙 (待發)",
+      "周宸宇 (待發)"
+    ],
+    "status": "已完成提醒發送 (成功: 0, 待發/無Email: 5)"
+  },
+  {
+    "id": "REM-1725960000",
+    "timestamp": "2026-09-09 09:00:00",
+    "type": "自動定時提醒",
+    "target_count": 6,
+    "recipients": [
+      "張宇哲 (yuzhe.parent@example.com)",
+      "黃宣雅 (xuanya.parent@example.com)",
+      "李冠廷 (guanting.parent@example.com)",
+      "王柏翔 (boxiang.parent@example.com)",
+      "吳若熙 (ruoxi.parent@example.com)",
+      "周宸宇 (chenyu.parent@example.com)"
+    ],
+    "status": "已完成提醒發送"
+  }
+]

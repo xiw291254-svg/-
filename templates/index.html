@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>學生回條繳交確認與自動提醒系統</title>
+  <meta name="description" content="極簡學生回條繳交追蹤系統，自動彈出催繳提醒，已交與未交一目了然。">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+  <style>
+    /* 極簡狀態網格 */
+    .master-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 860px) {
+      .master-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .column-box {
+      background: white;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      border: 1.5px solid var(--border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .column-head {
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+    }
+
+    .head-unsub {
+      background: #fef2f2;
+      border-bottom: 1.5px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .head-sub {
+      background: #ecfdf5;
+      border-bottom: 1.5px solid #a7f3d0;
+      color: #065f46;
+    }
+
+    .column-list {
+      max-height: 480px;
+      overflow-y: auto;
+      padding: 0.5rem;
+    }
+
+    .student-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      margin-bottom: 0.4rem;
+      transition: var(--transition);
+      border: 1px solid transparent;
+    }
+
+    .student-item.unsubmitted {
+      background: #fffafa;
+      border-color: #fee2e2;
+    }
+
+    .student-item.unsubmitted:hover {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+
+    .student-item.submitted {
+      background: #f0fdf4;
+      border-color: #dcfce7;
+    }
+
+    /* 一鍵確認按鈕 */
+    .btn-quick-check {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-full);
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+    }
+
+    .btn-quick-check:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);
+    }
+
+    /* 快捷繳交卡片 */
+    .quick-submit-bar {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.5rem;
+      border: 2px solid var(--primary-glow);
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    /* 進站自動跳出提醒 Modal */
+    .popup-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s;
+    }
+
+    .popup-modal-backdrop.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .popup-card {
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      max-width: 560px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 2.5px solid #f87171;
+      overflow: hidden;
+      transform: scale(0.92);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .popup-modal-backdrop.show .popup-card {
+      transform: scale(1);
+    }
+
+    .popup-top {
+      background: linear-gradient(135deg, #b91c1c, #dc2626);
+      color: white;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .tag-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      max-height: 160px;
+      overflow-y: auto;
+      padding: 0.75rem;
+      background: #fef2f2;
+      border-radius: var(--radius-md);
+      border: 1px dashed #fca5a5;
+      margin: 1rem 0;
+    }
+
+    .student-badge-btn {
+      background: white;
+      border: 1px solid #f87171;
+      color: #991b1b;
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .student-badge-btn:hover {
+      background: #fee2e2;
+      border-color: #dc2626;
+      transform: scale(1.03);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== 進站自動跳出催繳提醒彈窗 (進入網站自動跳出) ==================== -->
+  <div class="popup-modal-backdrop" id="autoPopupModal">
+    <div class="popup-card">
+      <div class="popup-top">
+        <div style="font-size: 2.5rem; margin-bottom: 0.25rem;">⚠️</div>
+        <h2 id="popupTitle" style="font-size: 1.4rem; font-weight: 800;">
+          📢【回條催繳提醒】您有回條尚未繳交！
+        </h2>
+        <div style="font-size: 0.88rem; color: #fee2e2; margin-top: 0.4rem;">
+          截止時間：<span id="popupDeadline" style="font-weight: 700;">-</span>
+        </div>
+      </div>
+
+      <div style="padding: 1.5rem;">
+        <div id="popupMessage" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-main); white-space: pre-line;">
+          同學/家長您好！系統偵測目前仍有同學尚未繳交回條。
+          請尚未交回條的同學，直接點擊下方自己的名字即可完成確認繳交！
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <div style="font-size: 0.88rem; font-weight: 700; color: #b91c1c;">
+            🔴 尚未繳交名單（點擊即可立即標記已交）：
+          </div>
+          <div class="tag-grid" id="popupTags">
+            <!-- 動態列出未交學生 -->
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+          <button class="btn btn-primary btn-block" onclick="closePopup()">
+            <span>👀</span> 進入查看完整回條紀錄表
+          </button>
+          <button class="btn btn-outline" onclick="copyReminderText()" title="複製LINE通知">
+            <span>💬</span> 複製催交通知
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 頂部導覽列 -->
+  <nav class="navbar">
+    <a href="/" class="nav-brand">
+      <div class="brand-icon">📋</div>
+      <span>學生回條簽收與自動催繳紀錄系統</span>
+    </a>
+    <div class="nav-links">
+      <button class="btn btn-outline btn-sm" onclick="showPopupManual()">
+        <span>🔔</span> 彈出提醒視窗
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="copyReminderText()">
+        <span>💬</span> 複製 LINE 催交訊息
+      </button>
+      <a href="/admin" class="nav-link nav-btn">
+        <span>⚙️</span> 管理後台 / Google 試算表 ➔
+      </a>
+    </div>
+  </nav>
+
+  <main class="container-wide" style="margin-top: 1.5rem;">
+
+    <!-- 頂部標題與說明卡片 -->
+    <header class="notice-banner" style="padding: 1.75rem 2rem; margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div class="notice-badge">
+            <span>📢</span> <span id="orgBadge">輔導處 重要回條通知</span>
+          </div>
+          <h1 class="notice-title" id="activityTitle" style="font-size: 1.6rem; margin-bottom: 0.4rem;">
+            載入活動中...
+          </h1>
+          <p id="activityDesc" style="color: #e0e7ff; font-size: 0.92rem; max-width: 800px; white-space: pre-line;">-</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); padding: 0.75rem 1.25rem; border-radius: var(--radius-md); text-align: right;">
+          <div style="font-size: 0.8rem; color: #e0e7ff;">截止時間</div>
+          <div id="deadlineBadge" style="font-size: 1rem; font-weight: 700; color: white;">-</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 快捷繳交列：不用填寫繁雜表單，選名字點一下就交！ -->
+    <section class="quick-submit-bar">
+      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <span style="font-size: 1.1rem;">⚡</span>
+        <div>
+          <strong style="font-size: 1.05rem; color: var(--text-main);">學生快速繳交確認：</strong>
+          <span style="font-size: 0.88rem; color: var(--text-muted);">免填複雜表單，選擇您的座號姓名即可完成回條繳交！</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+        <select id="quickStudentSelect" class="form-select" style="width: 220px; font-weight: 600;">
+          <option value="">-- 請選擇您的姓名座號 --</option>
+        </select>
+        <button class="btn btn-primary" onclick="submitSelectedStudent()">
+          <span>✅</span> 確認繳交回條
+        </button>
+      </div>
+    </section>
+
+    <!-- 即時統計面板 -->
+    <section class="stats-grid" style="margin-bottom: 1.5rem;">
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-label">應繳交總人數</span>
+          <div class="stat-value" id="statTotal">-</div>
+        </div>
+        <div class="stat-icon blue">👥</div>
+      </div>
+
+      <div class="stat-card" style="border: 2px solid #a7f3d0; background: #f0fdf4;">
+        <div class="stat-info">
+          <span class="stat-label" style="color: #065f46; font-weight: 700;">🟢 已繳交回條</span>
+          <div class="stat-value" style="color: #059669;" id="statSubmitted">-</div>
+        </div>
+        <div class="stat-icon green">✅</div>
+      </div>
+
+      <div class="stat-card" style="border: 2px solid #fecaca; background: #fff5f5;">
+        <div class="stat-info">
+          <span class="stat-label" style="color: #991b1b; font-weight: 700;">🔴 尚未繳交 (待催繳)</span>
+          <div class="stat-value" style="color: #dc2626;" id="statUnsubmitted">-</div>
+        </div>
+        <div class="stat-icon red">⏳</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-info" style="width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span class="stat-label">繳交進度</span>
+            <strong id="statRate" style="font-size: 1.5rem; color: var(--primary);">- %</strong>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progressFill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 核心總表：已提交 與 未提交 雙欄即時對照 ==================== -->
+    <section>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+          <span>📊</span> 回條繳交紀錄表（已提交 vs 未提交）
+        </h2>
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+          <span>🔒 狀態即時連動 Google 試算表</span>
+        </div>
+      </div>
+
+      <div class="master-grid">
+        
+        <!-- 左欄：🔴 尚未繳交名單 -->
+        <div class="column-box" style="border-color: #fecaca;">
+          <div class="column-head head-unsub">
+            <span>🔴 尚未繳交名單 (<span id="unsubCount">0</span> 人未交)</span>
+            <span style="font-size: 0.82rem; background: #fee2e2; padding: 0.2rem 0.6rem; border-radius: var(--radius-full);">待催交</span>
+          </div>
+          <div class="column-list" id="unsubListBody">
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted);">載入中...</div>
+          </div>
+        </div>
+
+        <!-- 右欄：🟢 已繳交名單 -->
+        <div class="column-box" style="border-color: #a7f3d0;">
+          <div class="column-head head-sub">
+            <span>🟢 已繳交回條名單 (<span id="subCount">0</span> 人已交)</span>
+            <span style="font-size: 0.82rem; background: #d1fae5; padding: 0.2rem 0.6rem; border-radius: var(--radius-full);">✓ 紀錄完成</span>
+          </div>
+          <div class="column-list" id="subListBody">
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted);">載入中...</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    let globalMaster = [];
+    let globalConfig = {};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadAllData();
+
+      // ★ 核心功能：點入網站自動跳出提醒訊息！
+      triggerAutoPopup();
+    });
+
+    // 載入所有資料
+    async function loadAllData() {
+      try {
+        const [resConfig, resMaster] = await Promise.all([
+          fetch('/api/config').then(r => r.json()),
+          fetch('/api/master-status').then(r => r.json())
+        ]);
+
+        globalConfig = resConfig;
+        globalMaster = resMaster.students || [];
+
+        // 活動標題與說明
+        const act = globalConfig.activity || {};
+        document.getElementById('activityTitle').textContent = act.title || '學生輔導活動回條';
+        document.getElementById('orgBadge').textContent = act.organization || '輔導處 重要通知';
+        document.getElementById('activityDesc').textContent = act.description || '';
+
+        if (act.deadline) {
+          const d = new Date(act.deadline);
+          const deadlineFormatted = isNaN(d) ? act.deadline : d.toLocaleString('zh-TW', { hour12: false });
+          document.getElementById('deadlineBadge').textContent = deadlineFormatted;
+          document.getElementById('popupDeadline').textContent = deadlineFormatted;
+        }
+
+        // 統計數字
+        document.getElementById('statTotal').textContent = resMaster.total;
+        document.getElementById('statSubmitted').textContent = resMaster.submitted_count;
+        document.getElementById('statUnsubmitted').textContent = resMaster.unsubmitted_count;
+
+        const rate = resMaster.total > 0 ? Math.round((resMaster.submitted_count / resMaster.total) * 100) : 0;
+        document.getElementById('statRate').textContent = `${rate}%`;
+        document.getElementById('progressFill').style.width = `${rate}%`;
+
+        document.getElementById('unsubCount').textContent = resMaster.unsubmitted_count;
+        document.getElementById('subCount').textContent = resMaster.submitted_count;
+
+        // 渲染清單與下拉選單
+        renderMasterLists();
+        renderSelectDropdown();
+
+      } catch (err) {
+        console.error('載入資料失敗:', err);
+      }
+    }
+
+    // ★ 進入網站自動跳出提醒
+    function triggerAutoPopup() {
+      const unsubList = globalMaster.filter(s => s.status === 'unsubmitted');
+      const tagBox = document.getElementById('popupTags');
+
+      if (unsubList.length > 0) {
+        tagBox.innerHTML = unsubList.map(s => `
+          <button class="student-badge-btn" onclick="quickCheckStudent('${s.student_class}', '${s.student_seat}', '${s.student_name}')" title="點擊確認繳交">
+            <span>🔴</span> ${s.student_class}班 ${s.student_seat}號 <strong>${s.student_name}</strong> ➔ 點此補交
+          </button>
+        `).join('');
+      } else {
+        tagBox.innerHTML = '<div style="color: #059669; font-weight: 700; width: 100%; text-align: center; padding: 1rem;">🎉 太棒了！全班皆已完成繳交！</div>';
+      }
+
+      // 自動延遲 300 毫秒平滑彈出
+      setTimeout(() => {
+        document.getElementById('autoPopupModal').classList.add('show');
+      }, 300);
+    }
+
+    function closePopup() {
+      document.getElementById('autoPopupModal').classList.remove('show');
+    }
+
+    function showPopupManual() {
+      triggerAutoPopup();
+    }
+
+    // 渲染下拉選單（僅列出尚未繳交的學生）
+    function renderSelectDropdown() {
+      const select = document.getElementById('quickStudentSelect');
+      const unsubList = globalMaster.filter(s => s.status === 'unsubmitted');
+
+      select.innerHTML = '<option value="">-- 請選擇您的姓名座號 --</option>' + 
+        unsubList.map(s => `
+          <option value="${s.student_class},${s.student_seat},${s.student_name}">
+            ${s.student_class} 班 ${s.student_seat} 號 ${s.student_name}
+          </option>
+        `).join('');
+    }
+
+    // 渲染雙欄清單
+    function renderMasterLists() {
+      const unsubBox = document.getElementById('unsubListBody');
+      const subBox = document.getElementById('subListBody');
+
+      const unsubmitted = globalMaster.filter(s => s.status === 'unsubmitted');
+      const submitted = globalMaster.filter(s => s.status === 'submitted');
+
+      // 未交清單
+      if (unsubmitted.length === 0) {
+        unsubBox.innerHTML = '<div style="text-align: center; padding: 3rem 1rem; color: #059669; font-weight: 700;">🎉 全員皆已完成繳交！目前無未交名單。</div>';
+      } else {
+        unsubBox.innerHTML = unsubmitted.map(stu => `
+          <div class="student-item unsubmitted">
+            <div>
+              <span class="badge badge-primary">${stu.student_class} 班 ${stu.student_seat} 號</span>
+              <strong style="font-size: 1.05rem; margin-left: 0.35rem; color: #111827;">${stu.student_name}</strong>
+              <span class="badge badge-danger" style="margin-left: 0.4rem;">未交</span>
+            </div>
+            <div>
+              <button class="btn-quick-check" onclick="quickCheckStudent('${stu.student_class}', '${stu.student_seat}', '${stu.student_name}')">
+                <span>✓</span> 確認已交
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // 已交清單
+      if (submitted.length === 0) {
+        subBox.innerHTML = '<div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">尚無已繳交資料</div>';
+      } else {
+        subBox.innerHTML = submitted.map(stu => `
+          <div class="student-item submitted">
+            <div>
+              <span class="badge badge-primary">${stu.student_class} 班 ${stu.student_seat} 號</span>
+              <strong style="font-size: 1.05rem; margin-left: 0.35rem; color: #111827;">${stu.student_name}</strong>
+              <span class="badge badge-success" style="margin-left: 0.4rem;">已繳交</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-muted);">
+              ${stu.submitted_at || '已記錄'}
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // 快捷繳交：從下拉選單送出
+    function submitSelectedStudent() {
+      const val = document.getElementById('quickStudentSelect').value;
+      if (!val) {
+        alert('請先選擇您的班級座號與姓名！');
+        return;
+      }
+      const [sClass, seat, name] = val.split(',');
+      quickCheckStudent(sClass, seat, name);
+    }
+
+    // 一鍵確認繳交（不填複雜表單）
+    async function quickCheckStudent(sClass, seat, name) {
+      if (!confirm(`確定要為【${sClass} 班 ${seat} 號 ${name}】登記為已繳交回條嗎？`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/submissions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            student_class: sClass,
+            student_seat: seat,
+            student_name: name,
+            choice: "已繳交回條",
+            parent_name: "本人/家長已交",
+            comments: "線上快速確認繳交",
+            signature: "verified"
+          })
+        });
+        const result = await res.json();
+
+        if (res.ok && result.status === 'success') {
+          alert(`🎉 成功！【${name}】的回條已完成繳交登記！\n系統已自動同步至紀錄表與 Google 試算表。`);
+          closePopup();
+          await loadAllData();
+        } else {
+          alert(result.message || '登記失敗');
+        }
+      } catch (e) {
+        alert('網路連線失敗，請檢查網路！');
+      }
+    }
+
+    // 複製 LINE 催交訊息
+    async function copyReminderText() {
+      try {
+        const res = await fetch('/api/remind/line-template');
+        const data = await res.json();
+        navigator.clipboard.writeText(data.template_text).then(() => {
+          alert('🎉 已複製催交提醒文字到剪貼簿！可直接貼到 LINE 班級群組催繳。');
+        }).catch(() => {
+          alert(data.template_text);
+        });
+      } catch (e) {
+        alert('取得催繳文字失敗');
+      }
+    }
+  </script>
+</body>
+</html>

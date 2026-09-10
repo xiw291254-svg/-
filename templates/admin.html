@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>回條繳交全班總覽與智慧催繳後台</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+  <style>
+    /* 篩選按鈕樣式 */
+    .filter-btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .filter-btn {
+      padding: 0.45rem 1rem;
+      border-radius: var(--radius-full);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid var(--border);
+      background: white;
+      color: var(--text-muted);
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .filter-btn:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+    .filter-btn.active-all {
+      background: var(--secondary);
+      border-color: var(--secondary);
+      color: white;
+    }
+    .filter-btn.active-sub {
+      background: #059669;
+      border-color: #059669;
+      color: white;
+    }
+    .filter-btn.active-unsub {
+      background: #dc2626;
+      border-color: #dc2626;
+      color: white;
+    }
+    /* 表格狀態列強調 */
+    .row-submitted {
+      background-color: rgba(236, 253, 245, 0.4);
+    }
+    .row-unsubmitted {
+      background-color: rgba(254, 242, 242, 0.45);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部導覽列 -->
+  <nav class="navbar">
+    <a href="/admin" class="nav-brand">
+      <div class="brand-icon">📋</div>
+      <span>回條管理系統・交了與沒交即時總覽</span>
+    </a>
+    <div class="nav-links">
+      <a href="/" target="_blank" class="nav-link">
+        <span>👁️</span> 前台簽繳頁面
+      </a>
+      <a href="javascript:void(0)" onclick="openGoogleSheetQuick()" id="btnOpenSheetNav" class="nav-link" style="color: #047857; background: #ecfdf5; font-weight: 700;">
+        <span>📊</span> 在 Google 試算表查看 ➔
+      </a>
+    </div>
+  </nav>
+
+  <main class="container-wide">
+
+    <!-- 頂部即時統計面板 -->
+    <section class="stats-grid">
+      <div class="stat-card" style="cursor: pointer;" onclick="setFilter('all')">
+        <div class="stat-info">
+          <span class="stat-label">應繳交總人數</span>
+          <div class="stat-value" id="statTotal">-</div>
+        </div>
+        <div class="stat-icon blue">👥</div>
+      </div>
+
+      <div class="stat-card" style="cursor: pointer;" onclick="setFilter('submitted')">
+        <div class="stat-info">
+          <span class="stat-label">🟢 已完成繳交</span>
+          <div class="stat-value" style="color: #059669;" id="statSubmitted">-</div>
+        </div>
+        <div class="stat-icon green">✅</div>
+      </div>
+
+      <div class="stat-card" style="cursor: pointer;" onclick="setFilter('unsubmitted')">
+        <div class="stat-info">
+          <span class="stat-label">🔴 尚未繳交 (待催繳)</span>
+          <div class="stat-value" style="color: #dc2626;" id="statUnsubmitted">-</div>
+        </div>
+        <div class="stat-icon red">⏳</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-info" style="width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span class="stat-label">整體繳交進度</span>
+            <strong id="statRate" style="font-size: 1.5rem; color: var(--primary);">- %</strong>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progressFill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 主功能標籤頁 Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-master')">
+        <span>📊</span> 全班繳交總覽 (交了與沒交一覽表)
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-reminders')">
+        <span>⚡</span> 催繳提醒中心
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-google')">
+        <span>📈</span> Google 試算表連動設定
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-roster')">
+        <span>👥</span> 學生名冊管理
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-settings')">
+        <span>⚙️</span> 活動內容設定
+      </button>
+    </div>
+
+    <!-- ==================== TAB 1: 全班繳交狀況總覽 (核心重點) ==================== -->
+    <section id="tab-master" class="tab-pane active">
+      <div class="card">
+        
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 class="card-title">
+              <span>📋</span> 全體學生繳交狀況對照總表
+            </h3>
+            <p class="card-subtitle">每位學生的「已繳交」與「未繳交」狀態一清二楚，隨時掌握進度。</p>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn btn-primary btn-sm" onclick="triggerManualReminder()">
+              <span>📧</span> 一鍵催繳未交者
+            </button>
+            <button class="btn btn-success btn-sm" onclick="openGoogleSheetQuick()">
+              <span>📊</span> 在 Google 試算表看總表
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="exportMasterCSV()">
+              <span>📥</span> 匯出完整名單
+            </button>
+          </div>
+        </div>
+
+        <!-- 篩選與搜尋列 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+          <div class="filter-btn-group">
+            <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-muted);">快速篩選：</span>
+            <button class="filter-btn active-all" id="btnFilterAll" onclick="setFilter('all')">
+              全部學生 (<span id="filterAllCount">0</span>)
+            </button>
+            <button class="filter-btn" id="btnFilterSubmitted" onclick="setFilter('submitted')">
+              🟢 僅看已繳交 (<span id="filterSubCount">0</span>)
+            </button>
+            <button class="filter-btn" id="btnFilterUnsubmitted" onclick="setFilter('unsubmitted')">
+              🔴 僅看尚未繳交 (<span id="filterUnsubCount">0</span>)
+            </button>
+          </div>
+
+          <div style="min-width: 240px;">
+            <input type="text" id="searchInput" class="form-input" placeholder="🔍 搜尋學生姓名、座號..." style="padding: 0.5rem 0.85rem; font-size: 0.88rem;">
+          </div>
+        </div>
+
+        <!-- 總表 Table -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 130px;">繳交狀態</th>
+                <th style="width: 80px;">班級</th>
+                <th style="width: 80px;">座號</th>
+                <th style="width: 120px;">學生姓名</th>
+                <th>意願勾選</th>
+                <th>繳交時間</th>
+                <th>家長聯絡電話</th>
+                <th>備註留言</th>
+                <th style="text-align: center; width: 140px;">動作</th>
+              </tr>
+            </thead>
+            <tbody id="masterTableBody">
+              <tr><td colspan="9" style="text-align: center; padding: 2.5rem;">資料載入中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: 催繳提醒中心 ==================== -->
+    <section id="tab-reminders" class="tab-pane">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem;">
+        
+        <!-- 卡片 1：一鍵批次發信催繳 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span>📧</span> 一鍵 Email 催交提醒
+            </h3>
+            <p class="card-subtitle">自動對所有尚未繳交名冊發送通知信。</p>
+          </div>
+
+          <div style="background: var(--warning-light); border: 1px solid #fde68a; border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+            <div style="font-weight: 700; color: #92400e; margin-bottom: 0.25rem;">
+              目前未交待催繳：<span id="remindTargetCount" style="font-size: 1.25rem; color: var(--danger);">0</span> 人
+            </div>
+            <div style="font-size: 0.85rem; color: #78350f;">
+              點擊後系統會批次寄信提醒未交家長，並附上專屬回條連結。
+            </div>
+          </div>
+
+          <button id="btnTriggerReminder" class="btn btn-primary btn-block" onclick="triggerManualReminder()">
+            <span>🚀</span> 立即執行催繳發送
+          </button>
+          
+          <div id="remindStatusBox" style="margin-top: 1rem; font-size: 0.88rem; display: none;"></div>
+        </div>
+
+        <!-- 卡片 2：LINE 班級群組催交文案生成器 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span>💬</span> LINE 班級群組催交文案
+            </h3>
+            <p class="card-subtitle">一鍵自動列出未交學生名單與網址，直接轉貼 LINE 群組！</p>
+          </div>
+
+          <div class="form-group">
+            <textarea id="lineMessageArea" class="form-textarea" rows="8" readonly style="font-family: 'Noto Sans TC', sans-serif; font-size: 0.88rem; background: #f8fafc; line-height: 1.6;"></textarea>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button class="btn btn-success btn-block" onclick="copyLineMessage()">
+              <span>📋</span> 一鍵複製催交訊息
+            </button>
+            <button class="btn btn-outline" onclick="loadLineMessage()" title="重新整理文案">
+              <span>🔄</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 自動定時催繳設定 -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span>⏰</span> 自動定時催繳排程器
+          </h3>
+          <p class="card-subtitle">每天時間一到，系統後端背景守護行程自動掃描未交名單並發信。</p>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-bottom: 1.25rem;">
+          <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 700;">
+            <input type="checkbox" id="chkAutoRemind" style="width: 20px; height: 20px;">
+            <span>啟用每日自動定時催繳</span>
+          </label>
+
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.92rem; font-weight: 600;">每日發送時間：</span>
+            <input type="time" id="inputDailyTime" class="form-input" style="width: 140px;" value="09:00">
+          </div>
+
+          <button class="btn btn-primary btn-sm" onclick="saveAutoSchedule()">
+            <span>💾</span> 儲存排程設定
+          </button>
+        </div>
+
+        <!-- 催繳發送歷史記錄 -->
+        <h4 style="font-size: 1rem; font-weight: 700; margin: 1.5rem 0 0.75rem;">📜 催繳提醒歷史日誌</h4>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>觸發時間</th>
+                <th>類型</th>
+                <th>催繳對象數</th>
+                <th>狀態與明細</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">載入中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: Google 試算表連動 ==================== -->
+    <section id="tab-google" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span>📊</span> Google 試算表 (Google Sheets) 即時同步設定
+          </h3>
+          <p class="card-subtitle">
+            只要進去 Google 試算表，第一頁就是<strong>【全班繳交狀態總表】</strong>，交了跟沒交一目了然！
+          </p>
+        </div>
+
+        <div style="background: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <h4 style="color: #065f46; font-weight: 700; margin-bottom: 0.25rem;">
+                🟢 雲端同步模式：交了與沒交即時呈現
+              </h4>
+              <p style="font-size: 0.88rem; color: #047857;">
+                學生送出回條時，試算表上該學生的狀態會立刻從「🔴尚未繳交」變成「🟢已繳交」！
+              </p>
+            </div>
+            <button class="btn btn-success" onclick="openGoogleSheetQuick()">
+              <span>🚀</span> 立即前往 Google 試算表
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="googleSheetUrl">
+            Google 試算表網址 (Sheet URL)
+          </label>
+          <input type="url" id="googleSheetUrl" class="form-input" placeholder="https://docs.google.com/spreadsheets/d/您的試算表ID/edit">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="googleWebhookUrl">
+            Google Apps Script 網頁應用程式網址 (Webhook URL)
+          </label>
+          <input type="url" id="googleWebhookUrl" class="form-input" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="saveGoogleSettings()">
+            <span>💾</span> 儲存設定
+          </button>
+          <button class="btn btn-outline" onclick="testGoogleConnection()">
+            <span>🧪</span> 測試連線 (發送測試資料至 Google)
+          </button>
+          <button class="btn btn-outline" onclick="copyGasCode()">
+            <span>📋</span> 一鍵複製最新 Google Apps Script 程式碼
+          </button>
+        </div>
+
+        <div style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+          <h4 style="font-weight: 700; margin-bottom: 0.75rem;">📖 2 分鐘串接步驟：</h4>
+          <ol style="margin-left: 1.5rem; line-height: 1.8; font-size: 0.92rem;">
+            <li>至 <a href="https://sheets.new" target="_blank" style="color: var(--primary); font-weight: 600;">Google 試算表</a> 建立新表。</li>
+            <li>點「擴充功能」➔「Apps Script」。</li>
+            <li>點上方按鈕「一鍵複製最新 Google Apps Script 程式碼」，貼上並存檔。</li>
+            <li>點「部署」➔「新增部署」➔ 齒輪選「網頁應用程式」，存取權限選「任何人」。</li>
+            <li>將部署獲得的網址貼到上方 Webhook 欄位並點儲存！</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: 學生名冊管理 ==================== -->
+    <section id="tab-roster" class="tab-pane">
+      <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 class="card-title">
+              <span>👥</span> 學生名冊維護
+            </h3>
+            <p class="card-subtitle">名冊為比對已交/未交狀態與催繳發信的基底。</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="showAddRosterModal()">
+            <span>➕</span> 批次匯入 / 新增學生
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>學號/編號</th>
+                <th>班級</th>
+                <th>座號</th>
+                <th>學生姓名</th>
+                <th>家長姓名</th>
+                <th>家長 Email</th>
+                <th>聯絡電話</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="rosterTableBody">
+              <tr><td colspan="8" style="text-align: center;">載入中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 5: 活動內容設定 ==================== -->
+    <section id="tab-settings" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span>⚙️</span> 活動資訊與郵件設定
+          </h3>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfgTitle">回條標題</label>
+          <input type="text" id="cfgTitle" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfgOrg">主辦單位 / 學校處室</label>
+          <input type="text" id="cfgOrg" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfgDeadline">繳交截止時間</label>
+          <input type="datetime-local" id="cfgDeadline" class="form-input" style="max-width: 300px;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfgDesc">通知單內容說明</label>
+          <textarea id="cfgDesc" class="form-textarea" rows="4"></textarea>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+          <button class="btn btn-primary" onclick="saveAllSettings()">
+            <span>💾</span> 儲存設定
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 批次匯入名冊 Modal -->
+  <div class="modal-backdrop" id="modalAddRoster">
+    <div class="modal-content" style="max-width: 600px;">
+      <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.5rem;">批次匯入 / 新增學生名冊</h3>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+        每行一位學生：<strong>班級, 座號, 學生姓名, 家長稱謂, 家長Email, 聯絡電話</strong>
+      </p>
+
+      <textarea id="rosterBatchText" class="form-textarea" rows="6" placeholder="例如：&#10;101, 09, 楊承祐, 楊爸爸, chengyou@example.com, 0911-222-333&#10;101, 10, 趙子萱, 趙媽媽, zixuan@example.com, 0922-333-444"></textarea>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
+        <button class="btn btn-outline" onclick="closeAddRosterModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitBatchRoster()">確認匯入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 簽名圖片放大預覽 Modal -->
+  <div class="modal-backdrop" id="sigPreviewModal" onclick="this.classList.remove('open')">
+    <div class="modal-content" style="max-width: 400px; text-align: center;">
+      <h4 style="margin-bottom: 1rem;">家長電子手寫簽章存根</h4>
+      <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: var(--radius-md); padding: 1rem;">
+        <img id="previewSigImg" src="" alt="簽名存根" style="max-width: 100%; height: auto;">
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-top: 1rem;" onclick="document.getElementById('sigPreviewModal').classList.remove('open')">關閉</button>
+    </div>
+  </div>
+
+  <script>
+    let globalMasterList = [];
+    let currentFilter = 'all'; // 'all', 'submitted', 'unsubmitted'
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await refreshAllData();
+      
+      // 搜尋輸入監聽
+      document.getElementById('searchInput').addEventListener('input', () => {
+        renderMasterTable();
+      });
+
+      // 每 15 秒自動同步
+      setInterval(refreshAllData, 15000);
+    });
+
+    async function refreshAllData() {
+      await loadMasterStatus();
+      await loadConfig();
+      await loadRoster();
+      await loadLogs();
+      await loadLineMessage();
+    }
+
+    // 載入整合狀態名冊（核心）
+    async function loadMasterStatus() {
+      try {
+        const res = await fetch('/api/master-status');
+        const data = await res.json();
+        globalMasterList = data.students || [];
+
+        // 更新統計卡片
+        document.getElementById('statTotal').textContent = data.total;
+        document.getElementById('statSubmitted').textContent = data.submitted_count;
+        document.getElementById('statUnsubmitted').textContent = data.unsubmitted_count;
+        document.getElementById('remindTargetCount').textContent = data.unsubmitted_count;
+
+        const rate = data.total > 0 ? Math.round((data.submitted_count / data.total) * 100) : 0;
+        document.getElementById('statRate').textContent = `${rate}%`;
+        document.getElementById('progressFill').style.width = `${rate}%`;
+
+        // 篩選按鈕計數
+        document.getElementById('filterAllCount').textContent = data.total;
+        document.getElementById('filterSubCount').textContent = data.submitted_count;
+        document.getElementById('filterUnsubCount').textContent = data.unsubmitted_count;
+
+        renderMasterTable();
+      } catch (e) {
+        console.error('載入總覽失敗:', e);
+      }
+    }
+
+    // 渲染全班繳交狀況總表
+    function renderMasterTable() {
+      const tbody = document.getElementById('masterTableBody');
+      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+
+      let filtered = globalMasterList.filter(stu => {
+        // 狀態篩選
+        if (currentFilter === 'submitted' && stu.status !== 'submitted') return false;
+        if (currentFilter === 'unsubmitted' && stu.status !== 'unsubmitted') return false;
+
+        // 關鍵字搜尋
+        if (keyword) {
+          const matchName = stu.student_name.toLowerCase().includes(keyword);
+          const matchSeat = String(stu.student_seat).includes(keyword);
+          const matchClass = String(stu.student_class).includes(keyword);
+          const matchParent = (stu.parent_name || '').toLowerCase().includes(keyword);
+          return matchName || matchSeat || matchClass || matchParent;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">查無符合條件的學生紀錄</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(stu => {
+        const isSub = stu.status === 'submitted';
+        return `
+          <tr class="${isSub ? 'row-submitted' : 'row-unsubmitted'}">
+            <td>
+              <span class="badge ${isSub ? 'badge-success' : 'badge-danger'}" style="font-size: 0.85rem; padding: 0.35rem 0.75rem;">
+                ${isSub ? '🟢 已繳交' : '🔴 尚未繳交'}
+              </span>
+            </td>
+            <td><span class="badge badge-primary">${stu.student_class} 班</span></td>
+            <td><strong>${stu.student_seat}</strong></td>
+            <td style="font-weight: 700; font-size: 1rem;">${stu.student_name}</td>
+            <td>
+              ${isSub ? `
+                <span class="badge ${stu.choice.includes('同意') ? 'badge-success' : 'badge-warning'}">
+                  ${stu.choice}
+                </span>
+              ` : '<span style="color: #94a3b8;">-</span>'}
+            </td>
+            <td style="font-size: 0.85rem; color: var(--text-muted);">${stu.submitted_at || '-'}</td>
+            <td>
+              <div>${stu.parent_name ? `${stu.parent_name}` : ''}</div>
+              <div style="font-size: 0.82rem; color: var(--text-muted);">${stu.parent_phone || stu.parent_email || '-'}</div>
+            </td>
+            <td style="font-size: 0.85rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${stu.comments || ''}">
+              ${stu.comments || '-'}
+            </td>
+            <td style="text-align: center;">
+              ${isSub && stu.signature ? `
+                <button class="btn btn-outline btn-sm" onclick="previewSig('${encodeURIComponent(stu.signature)}')">
+                  ✍️ 簽名
+                </button>
+              ` : ''}
+              ${!isSub ? `
+                <button class="btn btn-primary btn-sm" onclick="remindSingleStudent('${stu.student_name}', '${stu.student_class}', '${stu.student_seat}')">
+                  ⚡ 催繳
+                </button>
+              ` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 設定篩選條件
+    function setFilter(type) {
+      currentFilter = type;
+      document.getElementById('btnFilterAll').className = 'filter-btn' + (type === 'all' ? ' active-all' : '');
+      document.getElementById('btnFilterSubmitted').className = 'filter-btn' + (type === 'submitted' ? ' active-sub' : '');
+      document.getElementById('btnFilterUnsubmitted').className = 'filter-btn' + (type === 'unsubmitted' ? ' active-unsub' : '');
+      renderMasterTable();
+    }
+
+    // 單獨催繳一位學生
+    function remindSingleStudent(name, sClass, seat) {
+      const msg = `【輔導活動回條催繳提醒】\n親愛的家長您好，貴子弟 ${name}（${sClass}班 ${seat}號）的回條尚未完成線上簽繳，請儘速撥空至線上系統完成簽名確認，謝謝！\n👉 線上網址：http://localhost:5000/`;
+      navigator.clipboard.writeText(msg).then(() => {
+        alert(`已複製給【${name}】家長的專屬催交文字到剪貼簿！可直接傳送給家長。`);
+      }).catch(() => {
+        alert(msg);
+      });
+    }
+
+    // 頁籤切換
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // 載入設定
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/config');
+        const config = await res.json();
+        
+        const act = config.activity || {};
+        document.getElementById('cfgTitle').value = act.title || '';
+        document.getElementById('cfgOrg').value = act.organization || '';
+        document.getElementById('cfgDeadline').value = act.deadline || '';
+        document.getElementById('cfgDesc').value = act.description || '';
+
+        const rem = config.reminder_settings || {};
+        document.getElementById('chkAutoRemind').checked = rem.auto_enabled ?? true;
+        document.getElementById('inputDailyTime').value = rem.daily_time || '09:00';
+
+        const gs = config.google_sheets || {};
+        document.getElementById('googleSheetUrl').value = gs.sheet_url || '';
+        document.getElementById('googleWebhookUrl').value = gs.webhook_url || '';
+      } catch (e) {}
+    }
+
+    // 載入名冊
+    async function loadRoster() {
+      try {
+        const res = await fetch('/api/roster');
+        const list = await res.json();
+        const tbody = document.getElementById('rosterTableBody');
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 2rem;">尚未建立名冊</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(s => `
+          <tr>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;">${s.id}</td>
+            <td>${s.student_class} 班</td>
+            <td><strong>${s.student_seat}</strong></td>
+            <td style="font-weight: 700;">${s.student_name}</td>
+            <td>${s.parent_name || '-'}</td>
+            <td>${s.parent_email || '-'}</td>
+            <td>${s.parent_phone || '-'}</td>
+            <td>
+              <button class="btn btn-outline btn-sm" style="color: var(--danger);" onclick="deleteRosterItem('${s.id}')">刪除</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {}
+    }
+
+    // 載入日誌
+    async function loadLogs() {
+      try {
+        const res = await fetch('/api/remind/logs');
+        const list = await res.json();
+        const tbody = document.getElementById('logsTableBody');
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">尚無催繳日誌</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(log => `
+          <tr>
+            <td style="font-size: 0.85rem;">${log.timestamp}</td>
+            <td><span class="badge badge-primary">${log.type}</span></td>
+            <td><strong>${log.target_count}</strong> 位未交</td>
+            <td style="font-size: 0.85rem;">${log.status}</td>
+          </tr>
+        `).join('');
+      } catch (e) {}
+    }
+
+    // 載入 LINE 訊息
+    async function loadLineMessage() {
+      try {
+        const res = await fetch('/api/remind/line-template');
+        const data = await res.json();
+        document.getElementById('lineMessageArea').value = data.template_text;
+      } catch (e) {}
+    }
+
+    function copyLineMessage() {
+      const textarea = document.getElementById('lineMessageArea');
+      textarea.select();
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        alert('🎉 已複製催交訊息到剪貼簿！可直接貼到 LINE 班級群組。');
+      });
+    }
+
+    // 立即催繳
+    async function triggerManualReminder() {
+      const unsubList = globalMasterList.filter(s => s.status === 'unsubmitted');
+      if (unsubList.length === 0) {
+        alert('全員皆已完成繳交，無需催繳！');
+        return;
+      }
+
+      if (!confirm(`確定要對 ${unsubList.length} 位尚未繳交的家長立即發送催繳提醒嗎？`)) return;
+
+      const btn = document.getElementById('btnTriggerReminder');
+      const box = document.getElementById('remindStatusBox');
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> 正在執行催繳中...';
+      box.style.display = 'block';
+      box.innerHTML = '<span style="color: var(--primary);">正在呼叫郵件通知引擎...</span>';
+
+      try {
+        const res = await fetch('/api/remind/trigger', { method: 'POST' });
+        const result = await res.json();
+        box.innerHTML = `
+          <div style="background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 0.75rem; border-radius: var(--radius-sm);">
+            <strong>✓ ${result.message}</strong><br>
+            發送成功：${result.success_count} 封<br>
+            ${result.failed_count > 0 ? `待設定Email：${result.failed_count} 筆` : ''}
+          </div>
+        `;
+        await loadLogs();
+      } catch (err) {
+        box.innerHTML = '<span style="color: var(--danger);">發送失敗，請檢查網路連線。</span>';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀</span> 立即執行催繳發送';
+      }
+    }
+
+    function openGoogleSheetQuick() {
+      const url = document.getElementById('googleSheetUrl').value.trim() || 'https://docs.google.com/spreadsheets/';
+      window.open(url, '_blank');
+    }
+
+    async function copyGasCode() {
+      try {
+        const res = await fetch('/google-sheets-script.js');
+        const code = await res.text();
+        navigator.clipboard.writeText(code).then(() => {
+          alert('🎉 最新 Google Apps Script 程式碼已複製到剪貼簿！請至 Google 試算表貼上。');
+        });
+      } catch (e) {
+        window.open('/google-sheets-script.js', '_blank');
+      }
+    }
+
+    async function saveGoogleSettings() {
+      const sheet_url = document.getElementById('googleSheetUrl').value.trim();
+      const webhook_url = document.getElementById('googleWebhookUrl').value.trim();
+
+      try {
+        await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ google_sheets: { sheet_url, webhook_url } })
+        });
+        alert('Google 試算表設定已儲存！');
+      } catch (e) { alert('儲存失敗'); }
+    }
+
+    async function testGoogleConnection() {
+      const webhook_url = document.getElementById('googleWebhookUrl').value.trim();
+      if (!webhook_url) {
+        alert('請先填寫 Webhook 網址');
+        return;
+      }
+      try {
+        const res = await fetch('/api/test-google-sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ webhook_url })
+        });
+        const d = await res.json();
+        alert(d.message);
+      } catch (e) { alert('測試失敗'); }
+    }
+
+    async function saveAutoSchedule() {
+      const auto_enabled = document.getElementById('chkAutoRemind').checked;
+      const daily_time = document.getElementById('inputDailyTime').value;
+      try {
+        await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reminder_settings: { auto_enabled, daily_time } })
+        });
+        alert('排程設定已儲存！');
+      } catch (e) { alert('儲存失敗'); }
+    }
+
+    async function saveAllSettings() {
+      const payload = {
+        activity: {
+          title: document.getElementById('cfgTitle').value.trim(),
+          organization: document.getElementById('cfgOrg').value.trim(),
+          deadline: document.getElementById('cfgDeadline').value,
+          description: document.getElementById('cfgDesc').value.trim()
+        }
+      };
+      try {
+        await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        alert('活動設定已儲存！');
+      } catch (e) { alert('儲存失敗'); }
+    }
+
+    function previewSig(sigUrl) {
+      document.getElementById('previewSigImg').src = decodeURIComponent(sigUrl);
+      document.getElementById('sigPreviewModal').classList.add('open');
+    }
+
+    function showAddRosterModal() {
+      document.getElementById('modalAddRoster').classList.add('open');
+    }
+    function closeAddRosterModal() {
+      document.getElementById('modalAddRoster').classList.remove('open');
+    }
+
+    async function submitBatchRoster() {
+      const text = document.getElementById('rosterBatchText').value.trim();
+      if (!text) return;
+      const lines = text.split('\n');
+      const students = [];
+      for (const line of lines) {
+        const parts = line.split(/[,，\t]/).map(p => p.trim());
+        if (parts.length >= 3) {
+          students.push({
+            student_class: parts[0],
+            student_seat: parts[1],
+            student_name: parts[2],
+            parent_name: parts[3] || '',
+            parent_email: parts[4] || '',
+            parent_phone: parts[5] || ''
+          });
+        }
+      }
+      try {
+        const res = await fetch('/api/roster', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ students })
+        });
+        const d = await res.json();
+        alert(d.message);
+        closeAddRosterModal();
+        document.getElementById('rosterBatchText').value = '';
+        await refreshAllData();
+      } catch (e) { alert('匯入失敗'); }
+    }
+
+    async function deleteRosterItem(id) {
+      if (!confirm('確定要刪除此學生嗎？')) return;
+      try {
+        await fetch(`/api/roster/${id}`, { method: 'DELETE' });
+        await refreshAllData();
+      } catch (e) { alert('刪除失敗'); }
+    }
+
+    function exportMasterCSV() {
+      if (globalMasterList.length === 0) {
+        alert('尚無資料');
+        return;
+      }
+      let csv = "\uFEFF繳交狀態,班級,座號,學生姓名,參加意願,繳交時間,家長姓名,聯絡電話,備註\n";
+      globalMasterList.forEach(s => {
+        csv += `"${s.status_text}","${s.student_class}","${s.student_seat}","${s.student_name}","${s.choice||''}","${s.submitted_at||''}","${s.parent_name||''}","${s.parent_phone||''}","${(s.comments||'').replace(/"/g, '""')}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `全班回條繳交對照總表_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+    }
+  </script>
+</body>
+</html>

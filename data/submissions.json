@@ -1,0 +1,41 @@
+[
+  {
+    "id": "SUB-1789026907-03",
+    "student_class": "101",
+    "student_seat": "03",
+    "student_name": "張宇哲",
+    "parent_name": "本人/家長已交",
+    "parent_phone": "",
+    "choice": "已繳交回條",
+    "comments": "線上快速確認繳交",
+    "signature": "verified",
+    "submitted_at": "2026-09-10 15:55:07",
+    "google_synced": false
+  },
+  {
+    "id": "SUB-1725950400-001",
+    "student_class": "101",
+    "student_seat": "01",
+    "student_name": "陳品安",
+    "parent_name": "陳先生",
+    "parent_phone": "0912-345-671",
+    "choice": "同意參加輔導活動",
+    "comments": "謝謝老師關心孩子狀況，請多協助引導！",
+    "signature": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='60'><text x='20' y='40' font-family='cursive' font-size='24' fill='%231e3a8a'>陳先生</text></svg>",
+    "submitted_at": "2026-09-08 10:15:22",
+    "google_synced": true
+  },
+  {
+    "id": "SUB-1725954000-002",
+    "student_class": "101",
+    "student_seat": "02",
+    "student_name": "林子晴",
+    "parent_name": "林媽媽",
+    "parent_phone": "0923-456-782",
+    "choice": "同意參加輔導活動",
+    "comments": "已安排時間參加。",
+    "signature": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='60'><text x='20' y='40' font-family='cursive' font-size='24' fill='%231e3a8a'>林媽媽</text></svg>",
+    "submitted_at": "2026-09-08 14:30:10",
+    "google_synced": true
+  }
+]

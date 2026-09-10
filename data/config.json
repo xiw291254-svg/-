@@ -1,0 +1,37 @@
+{
+  "activity": {
+    "title": "114學年度 第二學期 學生個別與團體輔導活動家長同意回條",
+    "organization": "學生輔導諮商中心 / 輔導處",
+    "description": "親愛的家長您好：\n為促進學生身心健康與生活適應，輔導處本學期將辦理學習輔導與生涯適應探索活動。請您詳閱活動說明後，於線上勾選參加意願並完成簽名確認，以便統計人數並為孩子安排後續活動。\n\n● 活動時間：每週三下午 13:30 - 15:20\n● 活動地點：本校多元輔導教室 (三樓)\n● 聯絡電話：(02) 2345-6789 分機 123",
+    "deadline": "2026-09-30T23:59",
+    "options": [
+      "同意參加輔導活動",
+      "不同意參加（請於備註簡述原因）"
+    ]
+  },
+  "popup_reminder": {
+    "enabled": true,
+    "title": "📢【催繳重要提醒】輔導活動家長回條填寫通知",
+    "message": "親愛的家長/同學您好：\n本學期「學生個別與團體輔導活動回條」目前尚在收件催繳中，系統偵測目前仍有名單尚未提交，請尚未填寫的家長儘速於線上完成簽署確認！",
+    "show_unsubmitted_list": true
+  },
+  "google_sheets": {
+    "webhook_url": "",
+    "sheet_url": "https://docs.google.com/spreadsheets/",
+    "enabled": false
+  },
+  "reminder_settings": {
+    "auto_enabled": true,
+    "daily_time": "09:00",
+    "last_sent_date": "2026-09-10",
+    "email_subject": "【催交提醒】學生輔導活動家長同意回條尚未填寫通知",
+    "email_template": "親愛的 {parent_name} 家長您好：\n\n系統提醒您，貴子弟 {student_name}（{student_class} 班 {student_seat} 號）的「{activity_title}」尚未收到您的線上簽繳回條。\n\n本活動繳交截止時間為：{deadline}\n為了維護學生的權益與安排相關規劃，請您儘速點擊以下連結完成線上簽署：\n👉 線上簽繳連結：{form_url}\n\n如有任何疑問，歡迎隨時與輔導處聯繫，感謝您的支持與配合！\n\n{organization} 敬啟"
+  },
+  "email_config": {
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "",
+    "smtp_password": "",
+    "sender_name": "輔導處回條通知系統"
+  }
+}
