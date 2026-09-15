@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>回條繳繳通 SlipNotify Pro - 回條追蹤與自動催繳提醒系統</title>
+  <meta name="description" content="專為班級導師、活動主辦人設計的回條繳交追蹤與自動催繳短信提醒系統，即時統計繳交率、一鍵生成催繳簡訊與 LINE 通知。">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;900&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="logo-area">
+        <div class="logo-icon">
+          <i class="fa-solid fa-clipboard-check"></i>
+        </div>
+        <div class="logo-text">
+          <h1>回條繳繳通 <span class="badge-pro">Pro</span></h1>
+          <p class="subtitle">回條繳交追蹤與智能催繳短信系統</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Urgent Reminder Button with Live Counter Badge -->
+        <button id="btn-trigger-reminder" class="btn btn-urgent pulse-glow" title="開啟自動催繳智能提醒視窗">
+          <i class="fa-solid fa-bell"></i>
+          <span>催繳提醒中心</span>
+          <span id="header-pending-count" class="badge-count">0</span>
+        </button>
+
+        <button id="btn-add-slip" class="btn btn-primary">
+          <i class="fa-solid fa-plus"></i>
+          <span>新增回條</span>
+        </button>
+
+        <button id="btn-load-sample" class="btn btn-secondary" title="載入示範數據供快速體驗">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>示範資料</span>
+        </button>
+
+        <button id="btn-export-import" class="btn btn-ghost" title="資料匯出與備份">
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+          <span>備份/匯出</span>
+        </button>
+
+        <button id="btn-theme-toggle" class="btn-icon" title="切換深色/淺色主題" aria-label="切換主題">
+          <i class="fa-solid fa-moon" id="theme-icon"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-main">
+    
+    <!-- Top Stats Overview Dashboard -->
+    <section class="stats-grid">
+      <div class="stat-card glass-card">
+        <div class="stat-icon icon-blue">
+          <i class="fa-solid fa-folder-open"></i>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">進行中回條項目</span>
+          <h2 class="stat-value" id="stat-total-slips">0</h2>
+          <span class="stat-meta" id="stat-active-slips-meta">當前追蹤活動</span>
+        </div>
+      </div>
+
+      <div class="stat-card glass-card">
+        <div class="stat-icon icon-green">
+          <i class="fa-solid fa-user-check"></i>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">已繳交總人數</span>
+          <h2 class="stat-value" id="stat-submitted-count">0</h2>
+          <span class="stat-meta text-success" id="stat-submitted-rate">整體繳交率 0%</span>
+        </div>
+      </div>
+
+      <div class="stat-card glass-card" id="card-pending-stat">
+        <div class="stat-icon icon-amber">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">待繳交 (未繳+逾期)</span>
+          <h2 class="stat-value text-amber" id="stat-pending-count">0</h2>
+          <span class="stat-meta text-amber" id="stat-pending-sub">需跟進催繳人數</span>
+        </div>
+      </div>
+
+      <div class="stat-card glass-card" id="card-overdue-stat">
+        <div class="stat-icon icon-rose">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">已逾期名單</span>
+          <h2 class="stat-value text-rose" id="stat-overdue-count">0</h2>
+          <span class="stat-meta text-rose" id="stat-overdue-sub">超過截止日未交</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- App Content Layout (Slips List + Active Workspace) -->
+    <div class="workspace-layout">
+      
+      <!-- Left Sidebar: Slips / Events Switcher -->
+      <aside class="slips-sidebar glass-card">
+        <div class="sidebar-header">
+          <h3><i class="fa-solid fa-list-check"></i> 回條專案列表</h3>
+          <button id="btn-sidebar-add-slip" class="btn-icon-small" title="新增回條活動">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+
+        <div class="slips-list" id="slips-list-container">
+          <!-- Dynamic Slip Cards will be rendered here -->
+        </div>
+      </aside>
+
+      <!-- Right Main Workspace: Current Slip Details & Roster -->
+      <section class="slip-workspace glass-card" id="slip-workspace-card">
+        
+        <!-- Active Slip Header & Info Banner -->
+        <div class="slip-banner" id="active-slip-banner">
+          <div class="slip-banner-main">
+            <div class="slip-tag-row">
+              <span class="badge-status" id="slip-status-badge">進行中</span>
+              <span class="badge-class" id="slip-class-badge"><i class="fa-solid fa-users"></i> 全體學生</span>
+              <span class="badge-fee" id="slip-fee-badge" style="display: none;"><i class="fa-solid fa-sack-dollar"></i> 費用: $0</span>
+            </div>
+            <h2 class="slip-title" id="slip-detail-title">請先選擇或建立回條</h2>
+            <p class="slip-desc" id="slip-detail-desc">無詳細說明</p>
+            
+            <div class="slip-meta-details">
+              <span><i class="fa-regular fa-calendar-plus"></i> 發布: <strong id="slip-detail-created">-</strong></span>
+              <span><i class="fa-regular fa-calendar-xmark"></i> 截止: <strong id="slip-detail-deadline" class="text-rose">-</strong></span>
+              <span><i class="fa-solid fa-hourglass-half"></i> 狀態: <strong id="slip-detail-countdown">-</strong></span>
+            </div>
+          </div>
+
+          <div class="slip-banner-actions">
+            <button id="btn-open-sms-center" class="btn btn-urgent">
+              <i class="fa-solid fa-paper-plane"></i> 智能催繳簡訊
+            </button>
+            <button id="btn-edit-slip" class="btn btn-secondary">
+              <i class="fa-solid fa-pen-to-square"></i> 編輯
+            </button>
+            <button id="btn-delete-slip" class="btn btn-ghost-rose" title="刪除此回條">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Progress Bar for Current Slip -->
+        <div class="progress-section">
+          <div class="progress-info">
+            <span>繳交進度 (<span id="slip-progress-numbers">0/0 人</span>)</span>
+            <strong id="slip-progress-pct" class="text-primary">0%</strong>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="slip-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Roster Table Toolbar -->
+        <div class="roster-toolbar">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="roster-search-input" placeholder="搜尋學生姓名 / 座號 / 電話...">
+              <button id="btn-clear-search" class="btn-clear" style="display: none;">&times;</button>
+            </div>
+
+            <!-- Status Filter Pills -->
+            <div class="filter-pills" id="filter-pills-group">
+              <button class="filter-pill active" data-filter="all">全部 (<span id="count-filter-all">0</span>)</button>
+              <button class="filter-pill filter-pending" data-filter="pending">🟡 未繳 (<span id="count-filter-pending">0</span>)</button>
+              <button class="filter-pill filter-overdue" data-filter="overdue">🔴 已逾期 (<span id="count-filter-overdue">0</span>)</button>
+              <button class="filter-pill filter-submitted" data-filter="submitted">🟢 已繳交 (<span id="count-filter-submitted">0</span>)</button>
+              <button class="filter-pill filter-exempt" data-filter="exempt">⚪ 免繳 (<span id="count-filter-exempt">0</span>)</button>
+            </div>
+          </div>
+
+          <div class="toolbar-right">
+            <button id="btn-add-member" class="btn btn-primary btn-sm">
+              <i class="fa-solid fa-user-plus"></i> 新增成員
+            </button>
+            <button id="btn-batch-import" class="btn btn-secondary btn-sm" title="貼上整班名單一次匯入">
+              <i class="fa-solid fa-file-import"></i> 批量匯入
+            </button>
+            <button id="btn-export-csv" class="btn btn-ghost btn-sm" title="匯出 Excel/CSV 紀錄">
+              <i class="fa-solid fa-file-csv"></i> 匯出 CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Roster Batch Operations Bar (Hidden by default, shown when items selected) -->
+        <div class="batch-bar" id="batch-action-bar" style="display: none;">
+          <div class="batch-bar-info">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>已選取 <strong id="selected-members-count">0</strong> 位成員</span>
+          </div>
+          <div class="batch-bar-buttons">
+            <button id="btn-batch-mark-submitted" class="btn btn-success btn-sm">
+              <i class="fa-solid fa-check"></i> 標記為已繳交
+            </button>
+            <button id="btn-batch-mark-pending" class="btn btn-amber btn-sm">
+              <i class="fa-solid fa-clock"></i> 標記為未繳
+            </button>
+            <button id="btn-batch-send-sms" class="btn btn-urgent btn-sm">
+              <i class="fa-solid fa-comment-sms"></i> 批量催繳簡訊
+            </button>
+            <button id="btn-batch-delete" class="btn btn-danger btn-sm">
+              <i class="fa-solid fa-trash"></i> 刪除
+            </button>
+          </div>
+        </div>
+
+        <!-- Members / Students Roster Table -->
+        <div class="table-responsive">
+          <table class="roster-table" id="roster-table">
+            <thead>
+              <tr>
+                <th width="40"><input type="checkbox" id="check-all-members" title="全選/取消全選"></th>
+                <th width="70">座號</th>
+                <th width="120">姓名</th>
+                <th width="110">家長稱謂</th>
+                <th width="130">聯絡電話</th>
+                <th width="140">繳交狀態</th>
+                <th width="130">繳交時間</th>
+                <th>備註</th>
+                <th width="160" class="text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="roster-tbody">
+              <!-- Dynamically populated roster rows -->
+            </tbody>
+          </table>
+
+          <!-- Empty State Container -->
+          <div class="empty-roster-state" id="empty-roster-state" style="display: none;">
+            <div class="empty-icon">
+              <i class="fa-solid fa-clipboard-user"></i>
+            </div>
+            <h3>目前尚無成員名單</h3>
+            <p>您可以手動新增單一學生，或點擊「批量匯入」直接貼上整班名單。</p>
+            <div class="empty-actions">
+              <button class="btn btn-primary" onclick="openAddMemberModal()">
+                <i class="fa-solid fa-user-plus"></i> 新增第一位成員
+              </button>
+              <button class="btn btn-secondary" onclick="openBatchImportModal()">
+                <i class="fa-solid fa-file-import"></i> 批量匯入整班
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <!-- ================= MODALS SECTION ================= -->
+
+  <!-- 1. AUTO-LAUNCH / TRIGGERED REMINDER MODAL (自動啟動催繳提醒彈窗) -->
+  <div class="modal-backdrop" id="modal-auto-reminder">
+    <div class="modal-dialog modal-lg glass-modal">
+      <div class="modal-header modal-header-urgent">
+        <div class="modal-header-title">
+          <div class="urgent-pulse-icon">
+            <i class="fa-solid fa-bell"></i>
+          </div>
+          <div>
+            <h3>待繳回條智能催繳提醒</h3>
+            <p class="modal-subtitle">系統已自動偵測未繳與逾期名單，可直接在下方一鍵核銷或發送催繳短信</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" id="btn-close-auto-reminder">&times;</button>
+      </div>
+
+      <div class="modal-body reminder-modal-body">
+        
+        <!-- Summary Alert Box -->
+        <div class="alert-box alert-warning">
+          <div class="alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="alert-content">
+            <h4 id="reminder-summary-title">共有 0 位成員尚未繳交回條！</h4>
+            <p id="reminder-summary-desc">請盡快提醒家長或學生填妥並交回，以免影響後續作業。</p>
+          </div>
+        </div>
+
+        <!-- Filter / Active Slip in Reminder -->
+        <div class="reminder-controls">
+          <div class="form-group">
+            <label for="reminder-slip-select"><i class="fa-solid fa-filter"></i> 選擇回條項目：</label>
+            <select id="reminder-slip-select" class="form-control">
+              <!-- Options populated dynamically -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="reminder-template-select"><i class="fa-solid fa-comment-dots"></i> 催繳簡訊情境模板：</label>
+            <select id="reminder-template-select" class="form-control">
+              <option value="friendly">🌟 溫馨提醒款 (截止日前 2-3 天)</option>
+              <option value="urgent">⏰ 今日截止款 (即將截止緊急提醒)</option>
+              <option value="overdue">🚨 逾期催促款 (已超過截止日期)</option>
+              <option value="fee">💳 繳費+回條款 (含費用繳納提醒)</option>
+              <option value="line_list">📱 LINE 群組公告版 (列出未繳名單座號)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Quick Pending List with Instant Checkboxes -->
+        <div class="reminder-pending-section">
+          <div class="section-sub-header">
+            <h4><i class="fa-solid fa-users-slash"></i> 待催繳名單 (<span id="reminder-pending-count">0</span> 人)</h4>
+            <span class="help-text">勾選可直接標記為「已繳交」</span>
+          </div>
+
+          <div class="reminder-pending-list" id="reminder-pending-list">
+            <!-- Dynamic pending items -->
+          </div>
+        </div>
+
+        <!-- Generated SMS Preview & Copy Area -->
+        <div class="sms-preview-card">
+          <div class="sms-preview-header">
+            <div class="sms-header-left">
+              <i class="fa-solid fa-message text-primary"></i>
+              <strong>催繳短信 / LINE 通知內容預覽</strong>
+            </div>
+            <div class="sms-char-counter">
+              字數: <span id="sms-char-count">0</span> 字 | 約 <span id="sms-segments-count">1</span> 則簡訊
+            </div>
+          </div>
+          
+          <textarea id="reminder-sms-textarea" class="sms-textarea" rows="4"></textarea>
+          
+          <!-- Variable Tags Helpers -->
+          <div class="variable-tags-row">
+            <span class="tag-hint">點擊插入變數：</span>
+            <button type="button" class="btn-var-tag" data-var="{學生姓名}">{學生姓名}</button>
+            <button type="button" class="btn-var-tag" data-var="{家長姓名}">{家長姓名}</button>
+            <button type="button" class="btn-var-tag" data-var="{回條名稱}">{回條名稱}</button>
+            <button type="button" class="btn-var-tag" data-var="{截止日期}">{截止日期}</button>
+            <button type="button" class="btn-var-tag" data-var="{費用}">{費用}</button>
+            <button type="button" class="btn-var-tag" data-var="{未繳名單}">{未繳名單}</button>
+          </div>
+        </div>
+
+        <!-- Reminder Auto-Popup Settings -->
+        <div class="reminder-settings-row">
+          <label class="toggle-checkbox">
+            <input type="checkbox" id="chk-auto-popup-enabled" checked>
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">進入此程式時自動跳出催繳提醒視窗</span>
+          </label>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <div class="footer-left">
+          <button id="btn-copy-line-bulletin" class="btn btn-secondary">
+            <i class="fa-brands fa-line"></i> 複製 LINE 群組公告格式
+          </button>
+        </div>
+        <div class="footer-right">
+          <button id="btn-copy-sms-text" class="btn btn-primary">
+            <i class="fa-solid fa-copy"></i> 複製目前短信內容
+          </button>
+          <button id="btn-copy-all-individual-sms" class="btn btn-urgent" title="為每位未繳家長生成一對一簡訊">
+            <i class="fa-solid fa-comments"></i> 批量複製每人專屬簡訊
+          </button>
+          <button class="btn btn-ghost" id="btn-dismiss-reminder">關閉視窗</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. ADD / EDIT SLIP MODAL (新增/編輯回條專案彈窗) -->
+  <div class="modal-backdrop" id="modal-slip-form">
+    <div class="modal-dialog glass-modal">
+      <div class="modal-header">
+        <h3 id="slip-modal-title"><i class="fa-solid fa-clipboard-list"></i> 新增回條活動</h3>
+        <button class="btn-close-modal" id="btn-close-slip-modal">&times;</button>
+      </div>
+      <form id="form-slip">
+        <div class="modal-body">
+          <input type="hidden" id="slip-form-id">
+          
+          <div class="form-group">
+            <label for="slip-form-title">回條活動名稱 <span class="required">*</span></label>
+            <input type="text" id="slip-form-title" class="form-control" placeholder="例：三年二班 畢業旅行家長同意書" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label for="slip-form-class">班級 / 群組</label>
+              <input type="text" id="slip-form-class" class="form-control" placeholder="例：三年二班" value="三年二班">
+            </div>
+            <div class="form-group col-6">
+              <label for="slip-form-fee">相關費用 (選填，元)</label>
+              <input type="number" id="slip-form-fee" class="form-control" placeholder="0" min="0" value="0">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label for="slip-form-created">發布日期</label>
+              <input type="date" id="slip-form-created" class="form-control">
+            </div>
+            <div class="form-group col-6">
+              <label for="slip-form-deadline">截止繳交日期 <span class="required">*</span></label>
+              <input type="date" id="slip-form-deadline" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="slip-form-desc">回條說明 / 注意事項</label>
+            <textarea id="slip-form-desc" class="form-control" rows="3" placeholder="例：請家長務必簽章並勾選葷素食，費用請於截止日前連同回條繳交給班長。"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-slip-modal">取消</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> 儲存回條</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. ADD / EDIT MEMBER MODAL (新增/編輯成員彈窗) -->
+  <div class="modal-backdrop" id="modal-member-form">
+    <div class="modal-dialog glass-modal">
+      <div class="modal-header">
+        <h3 id="member-modal-title"><i class="fa-solid fa-user-pen"></i> 新增學生成員</h3>
+        <button class="btn-close-modal" id="btn-close-member-modal">&times;</button>
+      </div>
+      <form id="form-member">
+        <div class="modal-body">
+          <input type="hidden" id="member-form-id">
+          
+          <div class="form-row">
+            <div class="form-group col-4">
+              <label for="member-form-seat">座號 / 編號 <span class="required">*</span></label>
+              <input type="number" id="member-form-seat" class="form-control" placeholder="1" min="1" required>
+            </div>
+            <div class="form-group col-8">
+              <label for="member-form-name">學生姓名 <span class="required">*</span></label>
+              <input type="text" id="member-form-name" class="form-control" placeholder="例：王小明" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label for="member-form-parent">家長稱謂 / 姓名</label>
+              <input type="text" id="member-form-parent" class="form-control" placeholder="例：王爸爸 / 王大明">
+            </div>
+            <div class="form-group col-6">
+              <label for="member-form-phone">聯絡手機 / 電話</label>
+              <input type="tel" id="member-form-phone" class="form-control" placeholder="例：0912345678">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label for="member-form-status">繳交狀態</label>
+              <select id="member-form-status" class="form-control">
+                <option value="pending">🟡 未繳交 (Pending)</option>
+                <option value="submitted">🟢 已繳交 (Submitted)</option>
+                <option value="overdue">🔴 已逾期 (Overdue)</option>
+                <option value="exempt">⚪ 免繳 (Exempt)</option>
+              </select>
+            </div>
+            <div class="form-group col-6">
+              <label for="member-form-time">繳交時間</label>
+              <input type="datetime-local" id="member-form-time" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="member-form-note">備註說明</label>
+            <input type="text" id="member-form-note" class="form-control" placeholder="例：茹素、家長已電話確認口頭答應">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-member-modal">取消</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> 儲存成員</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. BATCH IMPORT MEMBERS MODAL (批量貼上匯入彈窗) -->
+  <div class="modal-backdrop" id="modal-batch-import">
+    <div class="modal-dialog modal-lg glass-modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-file-import"></i> 批量快速匯入成員名單</h3>
+        <button class="btn-close-modal" id="btn-close-batch-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="batch-intro">
+          您可以直接從 Excel、Word 或通訊錄複製多行資料貼在下方。支援以下格式：
+        </p>
+        <div class="format-examples">
+          <code>格式 1：座號, 姓名, 家長稱謂, 電話, 備註 (逗號或Tab分隔)</code>
+          <code>格式 2：1, 王小明, 0912345678</code>
+          <code>格式 3：每行一個姓名 (系統將自動指派連續座號)</code>
+        </div>
+
+        <div class="form-group">
+          <label for="batch-import-textarea">請貼上名單資料：</label>
+          <textarea id="batch-import-textarea" class="form-control font-mono" rows="8" placeholder="1, 王小明, 王爸爸, 0912345678&#10;2, 李美華, 李媽媽, 0923456789&#10;3, 陳大同, 陳家長, 0934567890"></textarea>
+        </div>
+
+        <div class="batch-options">
+          <label class="radio-label">
+            <input type="radio" name="batch-mode" value="append" checked>
+            <span>保留現有名單並追加</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="batch-mode" value="replace">
+            <span>覆蓋替換目前回條的現有名單</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="btn-cancel-batch-modal">取消</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-batch-import"><i class="fa-solid fa-check-double"></i> 開始解析並匯入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. INDIVIDUAL SMS & PHONE MOCKUP MODAL (單一成員手機短信預覽) -->
+  <div class="modal-backdrop" id="modal-individual-sms">
+    <div class="modal-dialog glass-modal modal-phone">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-mobile-screen"></i> 專屬催繳簡訊發送</h3>
+        <button class="btn-close-modal" id="btn-close-ind-sms">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Mock Phone UI -->
+        <div class="phone-mockup">
+          <div class="phone-speaker"></div>
+          <div class="phone-screen">
+            <div class="phone-header">
+              <span class="phone-time">12:00</span>
+              <span class="phone-receiver" id="mock-receiver-name">收件人：王小明家長 (0912-345-678)</span>
+            </div>
+            <div class="phone-chat-area">
+              <div class="chat-bubble incoming">
+                <p id="mock-sms-text">正在載入催繳簡訊內容...</p>
+                <span class="chat-time" id="mock-sms-time">剛剛</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sms-direct-actions">
+          <button id="btn-ind-copy" class="btn btn-primary btn-block">
+            <i class="fa-solid fa-copy"></i> 複製此簡訊內容
+          </button>
+          <a id="btn-ind-send-sms" href="#" class="btn btn-urgent btn-block">
+            <i class="fa-solid fa-paper-plane"></i> 開啟手機簡訊 App 發送 (sms:URI)
+          </a>
+          <a id="btn-ind-call" href="#" class="btn btn-secondary btn-block">
+            <i class="fa-solid fa-phone"></i> 撥打電話聯繫家長
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. BACKUP & EXPORT/IMPORT MODAL (備份與匯出入彈窗) -->
+  <div class="modal-backdrop" id="modal-backup">
+    <div class="modal-dialog glass-modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-database"></i> 系統資料備份與還原</h3>
+        <button class="btn-close-modal" id="btn-close-backup-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="backup-section">
+          <h4><i class="fa-solid fa-download text-primary"></i> 匯出備份 (Export)</h4>
+          <p>將目前所有的回條、成員與繳交紀錄匯出為 JSON 備份檔，或將當前名單匯出為 Excel CSV 表格。</p>
+          <div class="backup-buttons">
+            <button id="btn-export-json" class="btn btn-primary">
+              <i class="fa-solid fa-file-code"></i> 匯出完整系統 JSON 備份檔
+            </button>
+            <button id="btn-export-all-csv" class="btn btn-secondary">
+              <i class="fa-solid fa-file-csv"></i> 匯出當前回條名單 CSV
+            </button>
+          </div>
+        </div>
+
+        <hr class="modal-divider">
+
+        <div class="backup-section">
+          <h4><i class="fa-solid fa-upload text-amber"></i> 還原備份 (Import)</h4>
+          <p>從先前匯出的 JSON 備份檔還原全部資料：</p>
+          <input type="file" id="import-json-file" accept=".json" class="form-control" style="margin-bottom: 10px;">
+          <button id="btn-confirm-import-json" class="btn btn-amber">
+            <i class="fa-solid fa-file-arrow-up"></i> 還原備份資料
+          </button>
+        </div>
+
+        <hr class="modal-divider">
+
+        <div class="backup-section">
+          <h4><i class="fa-solid fa-trash text-rose"></i> 重置系統</h4>
+          <p>清除瀏覽器所有本機暫存資料並還原為乾淨狀態。</p>
+          <button id="btn-reset-data" class="btn btn-ghost-rose">
+            <i class="fa-solid fa-triangle-exclamation"></i> 清除全部資料
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Script Files -->
+  <script src="app.js"></script>
+</body>
+</html>
